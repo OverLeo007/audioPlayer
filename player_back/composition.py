@@ -30,7 +30,6 @@ class Composition:
         with open(get_data_path() + '\\testimg.png', 'wb') as file:
             file.write(self.img)
 
-
     def __repr__(self):
         return f'{self.artist} - {self.name} {duration_from_seconds(self.duration)}'
 

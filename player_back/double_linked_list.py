@@ -428,3 +428,9 @@ class DoubleLinkedList:
         str_list = "\n".join([' ' * 11 + str(i) for i in self])
         return f'{self.__class__.__name__}' \
                f'(size: {self.size},\ncontains: [\n' + str_list + '\n])'
+
+
+
+if __name__ == '__main__':
+    lst = create_linked_list(range(1, 10))
+    print(str(lst))

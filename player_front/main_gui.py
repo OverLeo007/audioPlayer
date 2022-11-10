@@ -7,10 +7,10 @@ from PyQt5.QtWidgets import (QScrollArea, QApplication, QWidget,
                              QPushButton, QTabWidget, QProgressBar)
 
 from PyQt5.QtGui import QPixmap, QIcon, QFont
-from PyQt5.QtCore import Qt, QRect, QUrl
+from PyQt5.QtCore import Qt, QRect, QUrl, pyqtSignal
 from player_front.ui_templates.templ import Ui_MainWindow
 
-from player_back.playlist import make_random_playlist
+from player_back.playlist import make_random_playlist, make_liked_playlist
 from player_back.composition import Composition
 from player_back.json_relator import Relator
 from player_back.utils import get_data_path
@@ -27,6 +27,9 @@ def make_pixmap(img, size_x, size_y):
 
 
 class TrackLayout(QHBoxLayout):
+
+    playing_status_changed = pyqtSignal(str)
+
     def __init__(self, composition: Composition):
         super().__init__()
 
@@ -68,18 +71,26 @@ class TrackLayout(QHBoxLayout):
             NOW_PLAYING.stop()
         NOW_PLAYING = self
         print(f"Играем {self.composition.name}")
+        self.playing_status_changed.emit("play")
+        self.parent().parent().parent().parent().parent().currentTrack = self
 
     def stop(self):
+        global NOW_PLAYING
+        NOW_PLAYING = None
         self.playTrackPushButton.show()
         self.stopTrackPushButton.hide()
         self.player.stop()
+        self.playing_status_changed.emit("stop")
         print(f"Перестали играть {self.composition.name}")
 
 
 class PlayListLayout(QWidget):
+    cur_track_changed = pyqtSignal()
 
     def __init__(self, playlist):
         super().__init__()
+
+        self.playlist = playlist
 
         self.layout = QVBoxLayout(self)
 
@@ -113,15 +124,31 @@ class PlayListLayout(QWidget):
         self.name = playlist.name
         self.trackLayouts = []
         for song in playlist:
-            self.tracksLayout.addLayout(track := TrackLayout(song.data))
+            track = TrackLayout(song.data)
+            track.playing_status_changed.connect(self.cur_track_change)
+            self.tracksLayout.addLayout(track)
             self.trackLayouts.append(track)
         self.currentTrack = self.trackLayouts[0]
+
+    def cur_track_change(self, status):
+        if status == "play":
+            self.currentTrack = self.sender()
+        elif status == "stop":
+            self.currentTrack = self.trackLayouts[0]
+        self.cur_track_changed.emit()
 
     def to_tab(self):
         return self, self.icon, self.name
 
+    def append_song(self, song):
+        self.playlist.append(song)
+        self.tracksLayout.addLayout(track := TrackLayout(song))
+        self.trackLayouts.append(track)
+
 
 class PlayListsTabWidget(QTabWidget):
+
+    playlist_cur_track_changed = pyqtSignal()
 
     def __init__(self, playlists):
         super().__init__()
@@ -133,7 +160,7 @@ class PlayListsTabWidget(QTabWidget):
         self.playlistLayouts = []
         for playlist in playlists:
             new_tab = PlayListLayout(playlist)
-
+            new_tab.cur_track_changed.connect(self.playlist_cur_track_changed_slot)
             self.addTab(*new_tab.to_tab())
             self.playlistLayouts.append(new_tab)
 
@@ -141,26 +168,54 @@ class PlayListsTabWidget(QTabWidget):
 
         self.tabBarClicked.connect(self.if_add_playlist)
 
+    def playlist_cur_track_changed_slot(self):
+
+
     def if_add_playlist(self, index):
         if index == self.tabs_count:
-            self.removeTab(index)
-
             new_playlist = make_random_playlist()
-            new_playlist_layout = PlayListLayout(new_playlist)
-            self.playlists.append(new_playlist)
-            # self.rel.save(self.playlists)
+            self.add_playlist(new_playlist)
 
-            self.addTab(*new_playlist_layout.to_tab())
-            self.playlistLayouts.append(new_playlist_layout)
+    def add_playlist(self, new_playlist):
+        new_playlist_layout = PlayListLayout(new_playlist)
 
-            self.addTab(QWidget(), 'Добавить плейлист')
+        self.removeTab(self.tabs_count)
+        self.playlists.append(new_playlist)
+        self.playlistLayouts.append(new_playlist_layout)
 
-            self.tabs_count += 1
+        self.addTab(*new_playlist_layout.to_tab())
+        self.addTab(QWidget(), 'Добавить плейлист')
+
+        self.tabs_count += 1
+
+    def get_playlist(self, name):
+        if name not in self:
+            raise ValueError(f"no playlists with name: {name}")
+        for playlist in self.playlists:
+            if playlist.name == name:
+                return playlist
+
+    def get_playlist_layout(self, name):
+        if name not in self:
+            raise ValueError(f"no playlists with name: {name}")
+        for playlist_layout in self.playlistLayouts:
+            if playlist_layout.name == name:
+                return playlist_layout
+
+    def __contains__(self, playlist_name):
+        for playlist in self.playlists:
+            if playlist.name == playlist_name:
+                print(playlist.name, playlist_name)
+                return True
+        return False
 
 
 class AudioLine(QWidget):
     def __init__(self, playlist):
         super().__init__()
+
+        self.cur_playlist = playlist
+
         self.audioLineLayout = QVBoxLayout(self)
         self.trackProgressBar = QProgressBar()
         self.audioLineLayout.addWidget(self.trackProgressBar)
@@ -185,8 +240,9 @@ class AudioLine(QWidget):
 
         self.audioLineLayout.addLayout(self.audioMetaLayout)
 
-    def set_track(self, playlist):
-        self.trackMetaLabel.setText(str(playlist.currentTrack.composition))
+    def set_playlist(self, playlist):
+        self.cur_playlist = playlist
+        self.trackMetaLabel.setText(str(self.cur_playlist.currentTrack.composition))
 
 
 class PlayerUI(QMainWindow, Ui_MainWindow):
@@ -205,12 +261,28 @@ class PlayerUI(QMainWindow, Ui_MainWindow):
 
         self.audioline = AudioLine(self.tabs.currentWidget())
         self.audioline.playPushButton.clicked.connect(self.play)
+        self.audioline.stopPushButton.clicked.connect(self.stop)
+        self.audioline.addToLikedPushButton.clicked.connect(self.like)
 
         self.verticalLayout_2.addWidget(self.tabs)
         self.verticalLayout_2.addWidget(self.audioline)
 
     def play(self):
+        self.audioline.playPushButton.hide()
+        self.audioline.stopPushButton.show()
+
         print(self.tabs.currentWidget().currentTrack.play())
+
+    def stop(self):
+        self.audioline.stopPushButton.hide()
+        self.audioline.playPushButton.show()
+        print(self.tabs.currentWidget().currentTrack.stop())
+
+    def like(self):
+        if "♥" not in self.tabs:
+            self.tabs.add_playlist(make_liked_playlist(self.tabs.currentWidget().currentTrack.composition))
+        else:
+            self.tabs.get_playlist_layout("♥").append_song(self.tabs.currentWidget().currentTrack.composition)
 
     def change_playlist(self, index):
         self.audioline.set_track(self.tabs.playlistLayouts[index])

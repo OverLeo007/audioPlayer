@@ -27,7 +27,7 @@ def make_list_of_all():
 
 
 def make_random_playlist():
-    from random import choice, shuffle, randint
+    from random import shuffle, randint
     from player_back.json_relator import Relator
 
     tr_list = get_compositions(list_of_all)
@@ -38,6 +38,10 @@ def make_random_playlist():
     rel = Relator(get_data_path() + '/playlists.json')
 
     return PlayList(create_node_sequence(res), f"random playlist No {len(rel.load())}")
+
+
+def make_liked_playlist(data):
+    return PlayList(PlayList.create_node(data), name="♥", pic="liked_playlist_pic.png")
 
 
 class PlayListItem(DoubleLinkedListItem):
@@ -54,7 +58,7 @@ class PlayList(DoubleLinkedList):
             self.name = name
 
         if head is None:
-            with open(get_data_path() + '/img.png', 'rb') as file:
+            with open(get_data_path() + ('/img.png' if pic is None else f"/{pic}", 'rb')) as file:
                 self.pic = file.read()
             self.duration = '0:0'
         else:
@@ -77,4 +81,4 @@ class PlayList(DoubleLinkedList):
 if __name__ == '__main__':
     # pl = make_list_of_all()
     # print(pl.get_dict())
-    print(make_random_playlist())
+    print(PlayList(PlayList.create_node('213'), 'liked', "liked_playlist_pic.png"))
