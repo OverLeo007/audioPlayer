@@ -15,7 +15,11 @@ class Composition:
         self.name = audio.tag.title
         self.artist = audio.tag.artist
         self.duration = audio.info.time_secs
-        self.img = audio.tag.images[0].image_data
+        try:
+            self.img = audio.tag.images[0].image_data
+        except Exception as e:
+            with open(get_data_path() + "\\unknown_img.png", 'rb') as file:
+                self.img = file.read()
 
     def loader(self, path):
         log_stream = io.StringIO()
@@ -39,6 +43,7 @@ def get_compositions(paths):
 
 
 if __name__ == '__main__':
-    new_comp = Composition(r'C:\Users\leva\PycharmProjects\audioPlayer_algo2QT\tracks\AMOGUS Dr Livesey Phonk.mp3')
+    new_comp = Composition(r'C:\Users\leva\PycharmProjects\audioPlayer_algo2QT\tracks\salamisound-4960259-open-door'
+                           r'-lock-knock.mp3')
     print(new_comp.img)
     new_comp.save_img()

@@ -330,6 +330,35 @@ class DoubleLinkedList:
         item.next_item = next_ptr
         self.size += 1
 
+    def swap(self, first_item, second_item):
+
+        if first_item == self.__head:
+            self.__head = second_item
+        elif second_item == self.__head:
+            self.__head = first_item
+        if first_item == self.__tail:
+            self.__tail = second_item
+        elif second_item == self.__tail:
+            self.__tail = first_item
+
+        temp = first_item.next_item
+        first_item.next_item = second_item.next_item
+        second_item.next_item = temp
+
+        if first_item.next_item is not None:
+            first_item.next_item.previous_item = first_item
+        if second_item.next_item is not None:
+            second_item.next_item.previous_item = second_item
+
+        temp = first_item.previous_item
+        first_item.previous_item = second_item.previous_item
+        second_item.previous_item = temp
+
+        if first_item.previous_item is not None:
+            first_item.previous_item.next_item = first_item
+        if second_item.previous_item is not None:
+            second_item.previous_item.next_item = second_item
+
     def __iter__(self) -> Iterator:
         """
         Метод реализации протокола итератора
@@ -430,7 +459,8 @@ class DoubleLinkedList:
                f'(size: {self.size},\ncontains: [\n' + str_list + '\n])'
 
 
-
 if __name__ == '__main__':
-    lst = create_linked_list(range(1, 10))
+    lst = create_linked_list(range(1, 5))
+    print(str(lst))
+    lst.swap(0, 3)
     print(str(lst))

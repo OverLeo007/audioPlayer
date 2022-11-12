@@ -8,6 +8,11 @@ class Relator:
 
     def __init__(self, path: str) -> None:
         self.json_file = path
+        with open(self.json_file, 'r', encoding="utf-8") as file:
+            tmp = json.load(file)
+            tmp[0] = make_list_of_all().get_dict()
+        with open(self.json_file, 'w', encoding="utf-8") as file:
+            json.dump(tmp, file, indent=4, ensure_ascii=False)
 
     def save(self, list_of_playlists: list[PlayList]) -> None:
         with open(self.json_file, 'w', encoding='utf-8') as file:
@@ -33,4 +38,4 @@ if __name__ == '__main__':
     rel = Relator(get_data_path() + '/playlists.json')
     # rel.save([make_list_of_all(), PlayList(head=None, name=None)])
 
-    print(rel.load_playlists())
+    # print(rel.load_playlists())

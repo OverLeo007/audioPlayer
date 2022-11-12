@@ -57,13 +57,39 @@ class PlayList(DoubleLinkedList):
         else:
             self.name = name
 
-        if head is None:
-            with open(get_data_path() + ('/img.png' if pic is None else f"/{pic}", 'rb')) as file:
+        self.pic, picpath = None, None
+
+        if pic is not None and head is not None:
+            picpath = get_data_path() + f"/{pic}"
+        elif pic is None and head is None:
+            picpath = get_data_path() + '/img.png'
+        elif pic is None and head is not None:
+            self.pic = head.data.img
+        if self.pic is None:
+            with open(picpath, "rb") as file:
                 self.pic = file.read()
+
+        if head is None:
             self.duration = '0:0'
         else:
-            self.pic = head.data.img
-            self.duration = duration_from_seconds(sum(map(lambda x: x.data.duration, self)))
+            if hasattr(head.data, "duration"):
+                self.duration = duration_from_seconds(sum(map(lambda x: x.data.duration, self)))
+
+        self.__current_track = head
+
+    @property
+    def current_track(self):
+        return self.__current_track.data
+
+    @current_track.setter
+    def current_track(self, value):
+        self.__current_track = self.find_node(value)
+
+    def next_track(self):
+        self.__current_track = self.__current_track.next_item
+
+    def previous_track(self):
+        self.__current_track = self.__current_track.previous_item
 
     def __str__(self):
         return f'{self.name} - {self.size} треков, длительностью {self.duration}'
@@ -77,8 +103,20 @@ class PlayList(DoubleLinkedList):
             res['tracks'].append(node.data.path)
         return res
 
+    def swap(self, item, direction):
+        first_item = self.find_node(item)
+        second_item = first_item.previous_item
+        if direction == "down":
+            second_item = first_item.next_item
+        super().swap(first_item, second_item)
+
+    def append(self, item: object) -> None:
+        super().append(item)
+        self.duration = duration_from_seconds(sum(map(lambda x: x.data.duration, self)))
+
 
 if __name__ == '__main__':
-    # pl = make_list_of_all()
-    # print(pl.get_dict())
-    print(PlayList(PlayList.create_node('213'), 'liked', "liked_playlist_pic.png"))
+    pl = make_liked_playlist(123)
+    print(pl.pic)
+
+    # print(PlayList(PlayList.create_node('213'), 'liked', "liked_playlist_pic.png"))
