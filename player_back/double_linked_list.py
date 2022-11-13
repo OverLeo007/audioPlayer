@@ -100,6 +100,11 @@ class DoubleLinkedListItem:
 
 
 def create_linked_list(nodes_list):
+    """
+    Функция создания двусвязного списка из списка данных
+    :param nodes_list: список данных
+    :return: двусвязный список
+    """
     new_list = DoubleLinkedList()
     for val in nodes_list:
         new_list.append(val)
@@ -330,7 +335,12 @@ class DoubleLinkedList:
         item.next_item = next_ptr
         self.size += 1
 
-    def swap(self, first_item, second_item):
+    def swap(self, first_item: DoubleLinkedListItem, second_item: DoubleLinkedListItem) -> None:
+        """
+        Метод обмена двух любых нод списка между собой
+        :param first_item: первая нода
+        :param second_item: вторая нода
+        """
 
         if first_item == self.__head:
             self.__head = second_item

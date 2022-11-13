@@ -1,7 +1,18 @@
+"""
+Соколов Лев Максимович. КИ21-17/1Б.
+
+Модуль с некоторыми утилитами
+"""
+
 import os
 
 
-def get_data_path():
+def get_data_path() -> str:
+    """
+    Функция нахождения папки с датой, поддерживающая запуск из любой папки проекта
+
+    :return: путь до папки с датой
+    """
     cur_dir = os.getcwd()
     if not cur_dir.endswith('audioPlayer_algo2QT'):
         res = []
@@ -12,22 +23,33 @@ def get_data_path():
                 res.extend([folder, 'data'])
                 break
         return '\\'.join(res)
-    else:
-        return os.path.join(cur_dir, 'data')
+
+    return os.path.join(cur_dir, 'data')
 
 
-def duration_from_seconds(s):
-    """Module to get the convert Seconds to a time like format."""
-    s = s
-    m, s = divmod(s, 60)
-    h, m = divmod(m, 60)
+def duration_from_seconds(seconds: int) -> str:
+    """
+    Функция перевода секунд в читаемый для человека формат
 
-    if h != 0:
-        timelapsed = f"{int(h):02}:{int(m):02}:{int(s):02}"
-    else:
-        timelapsed = f"{int(m):02}:{int(s):02}"
+    :param seconds: кол-во секунд
+    :return: строка типа hh:mm:ss
+    """
+    minutes, seconds = divmod(seconds, 60)
+    hours, minutes = divmod(minutes, 60)
 
-    return timelapsed
+    if hours != 0:
+        return f"{int(hours):02}:{int(minutes):02}:{int(seconds):02}"
+    return f"{int(minutes):02}:{int(seconds):02}"
+
+
+def duration_to_sec(milliseconds: int) -> int:
+    """
+    Функция перевода миллисекунд в секунды
+
+    :param milliseconds: кол-во мс
+    :return: секунды
+    """
+    return milliseconds // 1000
 
 
 if __name__ == '__main__':
