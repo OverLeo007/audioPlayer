@@ -100,6 +100,10 @@ class PlayList(DoubleLinkedList):
         self.__current_track = self.__current_track.previous_item
 
     def __str__(self) -> str:
+
+        return f'{self.name} - {self.size} треков, длительностью {self.duration}'
+
+    def __repr__(self):
         """
         Строковое представление плейлиста
         :return: строку с именем, кол-вом треков и их общей длительностью
@@ -197,6 +201,10 @@ def make_playlist(data: list[Composition], name: str) -> PlayList:
     """
     seq = create_node_sequence(data)
     return PlayList(seq, name=name)
+
+
+def make_empty_playlist():
+    return PlayList(head=None, name=None)
 
 
 def make_liked_playlist(data: object) -> PlayList:

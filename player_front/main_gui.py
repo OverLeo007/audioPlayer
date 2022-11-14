@@ -1,21 +1,31 @@
-from sys import argv, exit
+"""
+Соколов Лев Максимович. КИ21-17/1Б.
+
+Модуль, реализующий графический интерфейс плеера
+
+"""
+
+from sys import argv, exit  # pylint: disable=W0622
 
 from PyQt5.QtMultimedia import QMediaPlayer, QMediaContent
 from PyQt5.QtWidgets import (QScrollArea, QApplication, QWidget,
                              QMainWindow, QHBoxLayout, QVBoxLayout,
                              QLabel, QSpacerItem, QSizePolicy,
-                             QPushButton, QTabWidget, QSlider, QGroupBox, QDialog, QCheckBox, QLineEdit)
+                             QPushButton, QTabWidget, QSlider,
+                             QGroupBox, QDialog, QCheckBox, QLineEdit)
 
 from PyQt5.QtGui import QPixmap, QIcon, QFont
 from PyQt5.QtCore import Qt, QRect, QUrl, pyqtSignal, QSize
 from player_front.ui_templates.templ import Ui_MainWindow
 
-from player_back.playlist import make_random_playlist, make_liked_playlist, PlayList, make_list_of_all, make_playlist
+from player_back.playlist import (make_liked_playlist,
+                                  PlayList, make_list_of_all,
+                                  make_playlist, make_empty_playlist)
 from player_back.composition import Composition
 from player_back.json_relator import Relator
 from player_back.utils import get_data_path, duration_from_seconds
 
-slot_logs = True
+SLOT_LOGS = True
 
 
 def make_pixmap(img: bytes, size_x: int, size_y: int) -> QPixmap:
@@ -26,7 +36,7 @@ def make_pixmap(img: bytes, size_x: int, size_y: int) -> QPixmap:
     return pix
 
 
-class TrackGroupBox(QGroupBox):
+class TrackGroupBox(QGroupBox):  # pylint: disable=R0902
     switch_clicked = pyqtSignal(str)
     clicked = pyqtSignal()
 
@@ -94,24 +104,25 @@ class TrackGroupBox(QGroupBox):
         return self.composition.path
 
     def mousePressEvent(self, event) -> None:
-        if slot_logs:
+        if SLOT_LOGS:
             print(f"[TRACK]{self.composition} хочет играть")
         self.clicked.emit()
 
     def move_track_up(self):
-        if slot_logs:
+        if SLOT_LOGS:
             print(f"[TRACK]{self.composition} хочет поменяться с верхней")
         self.switch_clicked.emit("up")
 
     def move_track_down(self):
-        if slot_logs:
+        if SLOT_LOGS:
             print(f"[TRACK]{self.composition} хочет поменяться с нижней")
         self.switch_clicked.emit("down")
 
 
 class PlayListWidget(QWidget):
-    list_updated = pyqtSignal()
+    list_updated = pyqtSignal(int)
     want_to_activate = pyqtSignal()
+    want_to_delete = pyqtSignal(int)
 
     def __init__(self, playlist: PlayList):
         super().__init__()
@@ -135,7 +146,9 @@ class PlayListWidget(QWidget):
             self.deleteButton.clicked.connect(self.delete_playlist)
             self.controlButtonsLayout.addWidget(self.editButton)
             self.controlButtonsLayout.addWidget(self.deleteButton)
-            self.controlButtonsLayout.addItem(QSpacerItem(40, 20, QSizePolicy.Expanding, QSizePolicy.Minimum))
+            self.controlButtonsLayout.addItem(QSpacerItem(40, 20,
+                                                          QSizePolicy.Expanding,
+                                                          QSizePolicy.Minimum))
 
         self.trackGroupBoxes = []
 
@@ -171,7 +184,10 @@ class PlayListWidget(QWidget):
 
         self.scrollAreaWidget.setGeometry(QRect(0, 0, 780, 540))
 
-        self.currentTrack = self.trackGroupBoxes[0]
+        if self.trackGroupBoxes:
+            self.currentTrack = self.trackGroupBoxes[0]
+        else:
+            self.currentTrack = None
 
         self.editer = EditDialog(self)
         self.editer.list_edited.connect(self.set_playlist)
@@ -181,7 +197,7 @@ class PlayListWidget(QWidget):
         return self.playlist.name
 
     def switch_tracks(self, direction):
-        if slot_logs:
+        if SLOT_LOGS:
             print(f"[PLIST]{self.playlist.name} меняет {self.sender().composition} c {direction}")
         track = self.sender().composition
         self.playlist.swap(track, direction)
@@ -205,20 +221,40 @@ class PlayListWidget(QWidget):
         self.currentTrack = self.get_trackBox(self.playlist.current_track)
 
     def activate(self):
-        if slot_logs:
+        if SLOT_LOGS:
             print(f"[PLIST]{self.playlist.name} хочет активироваться")
         self.want_to_activate.emit()
 
-    def set_playlist(self, new_list):
+    def get_index_in_tabs(self):
+        parent_tab_widget = self.parent().parent()
+        tab_num = -1
+        for i in range(parent_tab_widget.tabs_count):
+            if parent_tab_widget.playlistLayouts[i] == self:
+                tab_num = i
+                break
+        return tab_num
 
+    def set_playlist(self, new_list):
+        tab_num = self.get_index_in_tabs()
         self.playlist = make_playlist(new_list["songs"], new_list["name"])
-        self.update_list()
+        if self.trackGroupBoxes:
+            self.currentTrack = self.trackGroupBoxes[0]
+        else:
+            self.currentTrack = None
+
+        self.icon.addPixmap(make_pixmap(self.playlist.pic, 32, 32))
+
+        self.update_list(tab_num)
         self.editer.hide()
 
-    def update_list(self):
-        if slot_logs:
+    def update_list(self, index=-1):
+
+        if SLOT_LOGS:
             print(f"[PLIST]{self.playlist.name} обновляет поля")
-        self.trackGroupBoxes.clear()
+        is_filled = False
+        if self.trackGroupBoxes:
+            self.trackGroupBoxes.clear()
+            is_filled = True
         count = self.scrollAreaWidgetLayout.count()
         for i in range(0, count):
             item = self.scrollAreaWidgetLayout.itemAt(i)
@@ -229,15 +265,19 @@ class PlayListWidget(QWidget):
             track.clicked.connect(self.song_picked)
             self.scrollAreaWidgetLayout.addWidget(track)
             self.trackGroupBoxes.append(track)
+
+        if not is_filled:
+            self.currentTrack = self.trackGroupBoxes[0]
+
         self.update_meta()
-        self.list_updated.emit()
+        self.list_updated.emit(index)
 
     def song_picked(self):
         self.playlist.current_track = self.sender().composition
         self.currentTrack = self.sender()
-        if slot_logs:
+        if SLOT_LOGS:
             print(f"[PLIST]{self.playlist.name} включает {self.sender().composition}")
-        self.list_updated.emit()
+        self.list_updated.emit(-1)
 
     def to_tab(self):
         return self, self.icon, self.name
@@ -255,12 +295,13 @@ class PlayListWidget(QWidget):
         self.playlist_meta.setText(str(self.playlist))
 
     def edit_playlist(self):
-        if slot_logs:
+        if SLOT_LOGS:
             print(f"[PLIST]{self.playlist.name} хочет отредактироваться")
 
         self.editer.show()
 
     def delete_playlist(self):
+        self.want_to_delete.emit(self.get_index_in_tabs())
         print(f"[PLIST]{self.playlist.name} хочет исчезнуть")
 
     def __contains__(self, item):
@@ -304,7 +345,6 @@ class EditDialog(QDialog):
             # songGroupBox.setLayout(songPickLayout)
             songCheckButton = QCheckBox(songGroupBox)
             if song.name in map(lambda x: x.name, self.cur_playlist_list):
-
                 songCheckButton.setChecked(True)
             self.song_list.append((songCheckButton, song))
             songNameLabel = QLabel(str(song))
@@ -335,16 +375,14 @@ class PlayListsTabWidget(QTabWidget):
 
     def __init__(self, playlists):
         super().__init__()
-
         self.tabs_count = len(playlists)
         self.playlists = playlists
-
         self.playlistLayouts = []
         for playlist in playlists:
             new_tab = PlayListWidget(playlist)
             new_tab.list_updated.connect(self.list_updated_slot)
             new_tab.want_to_activate.connect(self.list_activate_slot)
-            # new_tab.cur_track_changed.connect(self.playlist_cur_track_changed_slot)
+            new_tab.want_to_delete.connect(self.delete_tab)
             self.addTab(*new_tab.to_tab())
             self.playlistLayouts.append(new_tab)
 
@@ -352,31 +390,43 @@ class PlayListsTabWidget(QTabWidget):
 
         self.tabBarClicked.connect(self.if_add_playlist)
 
-    def list_updated_slot(self):
-        if slot_logs:
+    def list_updated_slot(self, index):
+        if SLOT_LOGS:
             print(f"[PLTAB] понял что {self.sender().playlist.name} обновился")
-        tab_ind = 0
-        for index, plist in enumerate(self.playlists):
-            print(index, plist)
-
+        if index != -1:
+            self.playlists[index] = self.sender().playlist
+            self.playlistLayouts[index] = self.sender()
+            self.setTabText(index, self.sender().playlist.name)
+            self.setTabIcon(index, self.sender().icon)
 
         self.cur_playlist_updated.emit(self.sender())
-        self.cur_playlist_want_to_activate.emit(self.sender())
+        if index == -1:
+            self.cur_playlist_want_to_activate.emit(self.sender())
 
     def list_activate_slot(self):
-        if slot_logs:
+        if SLOT_LOGS:
             print(f"[PLTAB] понял что {self.sender().playlist.name} хочет быть активным")
-        self.cur_playlist_want_to_activate.emit(self.sender())
+        if self.sender().trackGroupBoxes:
+            self.cur_playlist_want_to_activate.emit(self.sender())
+
+    def delete_tab(self, index):
+        self.tabs_count -= 1
+        self.playlists.pop(index)
+        self.playlistLayouts.pop(index)
+        self.removeTab(index)
+        self.removeTab(self.tabs_count)
+        self.addTab(QWidget(), 'Добавить плейлист')
 
     def if_add_playlist(self, index):
         if index == self.tabs_count:
-            new_playlist = make_random_playlist()
+            new_playlist = make_empty_playlist()
             self.add_playlist(new_playlist)
 
     def add_playlist(self, new_playlist):
         new_playlist_widget = PlayListWidget(new_playlist)
         new_playlist_widget.list_updated.connect(self.list_updated_slot)
         new_playlist_widget.want_to_activate.connect(self.list_activate_slot)
+        new_playlist_widget.want_to_delete.connect(self.delete_tab)
 
         self.removeTab(self.tabs_count)
         self.playlists.append(new_playlist)
@@ -408,8 +458,8 @@ class PlayListsTabWidget(QTabWidget):
         return False
 
 
-class AudioLine(QGroupBox):
-    def __init__(self, playlist):
+class AudioLine(QGroupBox):  # pylint: disable=R0902
+    def __init__(self, playlist):  # pylint: disable=R0915
         super().__init__()
 
         self.cur_playlist = playlist
@@ -465,12 +515,16 @@ class AudioLine(QGroupBox):
 
         # Добавляем в лейаут кнопочек
         self.controlButtonsLayout.addWidget(self.addToLikedPushButton)
-        self.controlButtonsLayout.addItem(QSpacerItem(40, 20, QSizePolicy.Expanding, QSizePolicy.Minimum))
+        self.controlButtonsLayout.addItem(QSpacerItem(40, 20,
+                                                      QSizePolicy.Expanding,
+                                                      QSizePolicy.Minimum))
         self.controlButtonsLayout.addWidget(self.prevTrackPushButton)
         self.controlButtonsLayout.addWidget(self.playPushButton)
         self.controlButtonsLayout.addWidget(self.pausePushButton)
         self.controlButtonsLayout.addWidget(self.nextTrackPushButton)
-        self.controlButtonsLayout.addItem(QSpacerItem(40, 20, QSizePolicy.Expanding, QSizePolicy.Minimum))
+        self.controlButtonsLayout.addItem(QSpacerItem(40, 20,
+                                                      QSizePolicy.Expanding,
+                                                      QSizePolicy.Minimum))
         crutchButton = QPushButton(" " * 7)
         crutchButton.setFlat(True)
         crutchButton.setEnabled(False)
@@ -484,8 +538,10 @@ class AudioLine(QGroupBox):
         self.pausePushButton.hide()
         self.trackNameLabel.setText(self.cur_playlist.currentTrack.name)
         self.trackAuthorLabel.setText(self.cur_playlist.currentTrack.artist)
-        self.trackDurationLabel.setText(duration_from_seconds(self.cur_playlist.currentTrack.duration))
-        self.trackProgressSlider.setRange(0, int(self.cur_playlist.currentTrack.duration))
+        self.trackDurationLabel.setText(
+            duration_from_seconds(self.cur_playlist.currentTrack.duration))
+        self.trackProgressSlider.setRange(
+            0, int(self.cur_playlist.currentTrack.duration))
         self.trackProgressSlider.setValue(0)
 
         self.playPushButton.clicked.connect(self.play)
@@ -497,21 +553,26 @@ class AudioLine(QGroupBox):
         self.update_fields()
 
     def set_playlist(self, playlist: PlayListWidget):
-        if slot_logs:
+        if SLOT_LOGS:
             print(f"[ALINE] делает {playlist.name} активным ")
         self.cur_playlist = playlist
         self.update_fields()
 
     def update_fields(self):
-        if slot_logs:
-            print(f"[ALINE] обновляет свои поля")
-        if self.player.media() != QMediaContent(QUrl.fromLocalFile(self.cur_playlist.currentTrack.path)):
-            self.player.setMedia(QMediaContent(QUrl.fromLocalFile(self.cur_playlist.currentTrack.path)))
-            self.track_pic.setPixmap(self.cur_playlist.currentTrack.trackPicLabel.pixmap())
+        if SLOT_LOGS:
+            print("[ALINE] обновляет свои поля")
+        if self.player.media() != QMediaContent(
+                QUrl.fromLocalFile(self.cur_playlist.currentTrack.path)):
+            self.player.setMedia(QMediaContent(
+                QUrl.fromLocalFile(self.cur_playlist.currentTrack.path)))
+            self.track_pic.setPixmap(
+                self.cur_playlist.currentTrack.trackPicLabel.pixmap())
             self.trackNameLabel.setText(self.cur_playlist.currentTrack.name)
             self.trackAuthorLabel.setText(self.cur_playlist.currentTrack.artist)
-            self.trackDurationLabel.setText(duration_from_seconds(self.cur_playlist.currentTrack.duration))
-            self.trackProgressSlider.setRange(0, int(self.cur_playlist.currentTrack.duration))
+            self.trackDurationLabel.setText(
+                duration_from_seconds(self.cur_playlist.currentTrack.duration))
+            self.trackProgressSlider.setRange(
+                0, int(self.cur_playlist.currentTrack.duration))
             self.trackProgressSlider.setValue(0)
 
     def play(self):
@@ -573,20 +634,25 @@ class PlayerUI(QMainWindow, Ui_MainWindow):
 
     def like(self):
         if "♥" not in self.tabs:
-            self.tabs.add_playlist(make_liked_playlist(self.tabs.currentWidget().currentTrack.composition))
+            self.tabs.add_playlist(make_liked_playlist(
+                self.tabs.currentWidget().currentTrack.composition))
         else:
             liked_playlist = self.tabs.get_playlist_layout("♥")
             liked_playlist.append_song(self.tabs.currentWidget().currentTrack.composition)
 
-    def activate_playlist(self, playlistWidget):
-        if slot_logs:
-            print(f"[UMAIN] хочет установить {playlistWidget.name} активным")
-        self.audioline.set_playlist(playlistWidget)
+    def activate_playlist(self, playlist_widget):
+        if SLOT_LOGS:
+            print(f"[UMAIN] хочет установить {playlist_widget.name} активным")
+        self.audioline.set_playlist(playlist_widget)
 
     def upd_audioline(self):
-        if slot_logs:
-            print(f"[UMAIN] хочет обновить  поля [ALINE]")
+        if SLOT_LOGS:
+            print("[UMAIN] хочет обновить  поля [ALINE]")
         self.audioline.update_fields()
+
+    def closeEvent(self, event) -> None:  # pylint: disable=C0103
+        self.rel.save(self.tabs.playlists)
+        event.accept()
 
 
 if __name__ == '__main__':

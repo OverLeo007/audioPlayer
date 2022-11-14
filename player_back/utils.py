@@ -14,10 +14,10 @@ def get_data_path() -> str:
     :return: путь до папки с датой
     """
     cur_dir = os.getcwd()
-    if not cur_dir.endswith('audioPlayer'):
+    if not cur_dir.endswith('audioPlayer_algo2QT'):
         res = []
         for folder in cur_dir.split("\\"):
-            if folder != 'audioPlayer':
+            if folder != 'audioPlayer_algo2QT':
                 res.append(folder)
             else:
                 res.extend([folder, 'data'])
