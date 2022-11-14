@@ -4,7 +4,7 @@
 Модуль, в котором реализован плейлист и сопутствующие ему функции
 """
 
-from typing import Union
+from typing import Union, Optional
 
 from player_back.double_linked_list import DoubleLinkedList, DoubleLinkedListItem
 from player_back.composition import Composition, get_compositions
@@ -16,6 +16,7 @@ class PlayListItem(DoubleLinkedListItem):
     """
     Класс элемента плейлиста, для более понятного именного обращения
     """
+
     def __init__(self, composition: Composition):
         super().__init__(composition)
 
@@ -35,6 +36,7 @@ class PlayList(DoubleLinkedList):
         * current_track
         *
     """
+
     def __init__(self, head: Union[PlayListItem, None], name: Union[str, None], pic=None) -> None:
         """
         Конструктор плейлиста, вычисляет общее время прослушиваемых треков
@@ -70,7 +72,7 @@ class PlayList(DoubleLinkedList):
         self.__current_track = head
 
     @property
-    def current_track(self) -> Composition:
+    def current_track(self) -> Optional[object]:
         """
         Свойство - геттер, возвращает дату текущего трека
         :return: дата текущего трека
@@ -137,7 +139,7 @@ class PlayList(DoubleLinkedList):
         self.duration = duration_from_seconds(sum(map(lambda x: x.data.duration, self)))
 
 
-def create_node_sequence(data) -> PlayListItem:
+def create_node_sequence(data) -> Union[DoubleLinkedListItem, None]:
     """
     Функция создания связанных нод из списка данных
     :param data: список значений для PlaylistItem.data
@@ -184,6 +186,17 @@ def make_random_playlist() -> PlayList:
     rel = Relator(get_data_path() + '/playlists.json')
 
     return PlayList(create_node_sequence(res), f"random playlist No {len(rel.load())}")
+
+
+def make_playlist(data: list[Composition], name: str) -> PlayList:
+    """
+    Функция создания плейлиста из списка композиций
+    :param data: список композиций
+    :param name: имя плейлиста
+    :return: Плейлист с текущими композициями
+    """
+    seq = create_node_sequence(data)
+    return PlayList(seq, name=name)
 
 
 def make_liked_playlist(data: object) -> PlayList:

@@ -4,18 +4,18 @@ from PyQt5.QtMultimedia import QMediaPlayer, QMediaContent
 from PyQt5.QtWidgets import (QScrollArea, QApplication, QWidget,
                              QMainWindow, QHBoxLayout, QVBoxLayout,
                              QLabel, QSpacerItem, QSizePolicy,
-                             QPushButton, QTabWidget, QSlider, QFrame, QGroupBox)
+                             QPushButton, QTabWidget, QSlider, QGroupBox, QDialog, QCheckBox, QLineEdit)
 
 from PyQt5.QtGui import QPixmap, QIcon, QFont
 from PyQt5.QtCore import Qt, QRect, QUrl, pyqtSignal, QSize
 from player_front.ui_templates.templ import Ui_MainWindow
 
-from player_back.playlist import make_random_playlist, make_liked_playlist, PlayList
+from player_back.playlist import make_random_playlist, make_liked_playlist, PlayList, make_list_of_all, make_playlist
 from player_back.composition import Composition
 from player_back.json_relator import Relator
-from player_back.utils import get_data_path, duration_from_seconds, duration_to_sec
+from player_back.utils import get_data_path, duration_from_seconds
 
-slot_logs = False
+slot_logs = True
 
 
 def make_pixmap(img: bytes, size_x: int, size_y: int) -> QPixmap:
@@ -36,9 +36,6 @@ class TrackGroupBox(QGroupBox):
 
         # Объявляем
         self.composition = composition
-
-        self.player = QMediaPlayer()
-        self.player.setMedia(QMediaContent(QUrl.fromLocalFile(composition.path)))
 
         self.trackPicLabel = QLabel()
         self.trackPicLabel.setPixmap(make_pixmap(composition.img, 50, 50))
@@ -176,6 +173,9 @@ class PlayListWidget(QWidget):
 
         self.currentTrack = self.trackGroupBoxes[0]
 
+        self.editer = EditDialog(self)
+        self.editer.list_edited.connect(self.set_playlist)
+
     @property
     def name(self):
         return self.playlist.name
@@ -209,6 +209,12 @@ class PlayListWidget(QWidget):
             print(f"[PLIST]{self.playlist.name} хочет активироваться")
         self.want_to_activate.emit()
 
+    def set_playlist(self, new_list):
+
+        self.playlist = make_playlist(new_list["songs"], new_list["name"])
+        self.update_list()
+        self.editer.hide()
+
     def update_list(self):
         if slot_logs:
             print(f"[PLIST]{self.playlist.name} обновляет поля")
@@ -223,6 +229,7 @@ class PlayListWidget(QWidget):
             track.clicked.connect(self.song_picked)
             self.scrollAreaWidgetLayout.addWidget(track)
             self.trackGroupBoxes.append(track)
+        self.update_meta()
         self.list_updated.emit()
 
     def song_picked(self):
@@ -236,12 +243,13 @@ class PlayListWidget(QWidget):
         return self, self.icon, self.name
 
     def append_song(self, song):
-        self.playlist.append(song)
-        self.scrollAreaWidgetLayout.addWidget(track := TrackGroupBox(song))
-        self.trackGroupBoxes.append(track)
-        track.switch_clicked.connect(self.switch_tracks)
-        track.clicked.connect(self.song_picked)
-        self.update_meta()
+        if song not in self:
+            self.playlist.append(song)
+            self.scrollAreaWidgetLayout.addWidget(track := TrackGroupBox(song))
+            self.trackGroupBoxes.append(track)
+            track.switch_clicked.connect(self.switch_tracks)
+            track.clicked.connect(self.song_picked)
+            self.update_meta()
 
     def update_meta(self):
         self.playlist_meta.setText(str(self.playlist))
@@ -250,8 +258,75 @@ class PlayListWidget(QWidget):
         if slot_logs:
             print(f"[PLIST]{self.playlist.name} хочет отредактироваться")
 
+        self.editer.show()
+
     def delete_playlist(self):
         print(f"[PLIST]{self.playlist.name} хочет исчезнуть")
+
+    def __contains__(self, item):
+        if item in self.playlist:
+            return True
+        if item in self.trackGroupBoxes:
+            return True
+        return False
+
+
+class EditDialog(QDialog):
+    list_edited = pyqtSignal(dict)
+
+    def __init__(self, parent=None):
+        super(EditDialog, self).__init__(parent)
+        self.parent = parent
+        self.cur_playlist_list = [song.data for song in self.parent.playlist]
+        self.all_list = [song.data for song in make_list_of_all()]
+
+        self.layout = QVBoxLayout(self)
+
+        # self.songNamesScrollArea = QScrollArea(self)
+        self.scrollAreaWidget = QWidget()
+        self.scrollAreaWidgetLayout = QVBoxLayout(self.scrollAreaWidget)
+        # self.songNamesScrollArea.setWidget(self.scrollAreaWidget)
+        self.listNameLineEdit = QLineEdit()
+        self.listNameLineEdit.setText(self.parent.name)
+        self.buttonsLayout = QHBoxLayout()
+        self.okButton = QPushButton("Завершить")
+        self.exitButton = QPushButton("Отмена")
+        self.exitButton.clicked.connect(self.exit_slot)
+        self.okButton.clicked.connect(self.ok_slot)
+        self.buttonsLayout.addWidget(self.exitButton)
+        self.buttonsLayout.addWidget(self.okButton)
+
+        self.song_list = []
+
+        for song in self.all_list:
+            songGroupBox = QGroupBox(self.scrollAreaWidget)
+            songPickLayout = QHBoxLayout(songGroupBox)
+            # songGroupBox.setLayout(songPickLayout)
+            songCheckButton = QCheckBox(songGroupBox)
+            if song.name in map(lambda x: x.name, self.cur_playlist_list):
+
+                songCheckButton.setChecked(True)
+            self.song_list.append((songCheckButton, song))
+            songNameLabel = QLabel(str(song))
+
+            songPickLayout.addWidget(songCheckButton)
+            songPickLayout.addWidget(songNameLabel)
+            songPickLayout.addItem(QSpacerItem(40, 20, QSizePolicy.Expanding, QSizePolicy.Minimum))
+            self.scrollAreaWidgetLayout.addWidget(songGroupBox)
+
+        self.layout.addWidget(self.listNameLineEdit)
+        self.layout.addWidget(self.scrollAreaWidget)
+        # self.layout.addLayout(self.scrollAreaWidgetLayout)
+        self.layout.addLayout(self.buttonsLayout)
+
+    def exit_slot(self):
+        self.hide()
+
+    def ok_slot(self):
+        self.list_edited.emit({
+            "name": self.listNameLineEdit.text(),
+            "songs": list(map(lambda x: x[1], filter(lambda x: x[0].isChecked(), self.song_list)))
+        })
 
 
 class PlayListsTabWidget(QTabWidget):
@@ -280,6 +355,11 @@ class PlayListsTabWidget(QTabWidget):
     def list_updated_slot(self):
         if slot_logs:
             print(f"[PLTAB] понял что {self.sender().playlist.name} обновился")
+        tab_ind = 0
+        for index, plist in enumerate(self.playlists):
+            print(index, plist)
+
+
         self.cur_playlist_updated.emit(self.sender())
         self.cur_playlist_want_to_activate.emit(self.sender())
 
@@ -393,6 +473,7 @@ class AudioLine(QGroupBox):
         self.controlButtonsLayout.addItem(QSpacerItem(40, 20, QSizePolicy.Expanding, QSizePolicy.Minimum))
         crutchButton = QPushButton(" " * 7)
         crutchButton.setFlat(True)
+        crutchButton.setEnabled(False)
         self.controlButtonsLayout.addWidget(crutchButton)
 
         # Добавляем в главный лейаут
@@ -433,9 +514,6 @@ class AudioLine(QGroupBox):
             self.trackProgressSlider.setRange(0, int(self.cur_playlist.currentTrack.duration))
             self.trackProgressSlider.setValue(0)
 
-            # self.pausePushButton.hide()
-            # self.playPushButton.show()
-
     def play(self):
         self.playPushButton.hide()
         self.pausePushButton.show()
@@ -463,7 +541,6 @@ class AudioLine(QGroupBox):
         self.player.setPosition(self.trackProgressSlider.value() * 1000)
 
     def playback_slot(self, status):
-        print(status)
         if status == QMediaPlayer.EndOfMedia:
             self.set_next_track()
             self.play()
@@ -476,7 +553,7 @@ class PlayerUI(QMainWindow, Ui_MainWindow):
     def __init__(self):
         super().__init__()
         self.setupUi(self)
-        self.rel = Relator(get_data_path() + '/playlists.json')
+        self.rel = Relator(get_data_path() + '\\playlists.json')
 
         self.playlists = self.rel.load_playlists()
         # self.playlists.append(make_random_playlist())

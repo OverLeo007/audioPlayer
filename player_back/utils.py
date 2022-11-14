@@ -14,10 +14,10 @@ def get_data_path() -> str:
     :return: путь до папки с датой
     """
     cur_dir = os.getcwd()
-    if not cur_dir.endswith('audioPlayer_algo2QT'):
+    if not cur_dir.endswith('audioPlayer'):
         res = []
         for folder in cur_dir.split("\\"):
-            if folder != 'audioPlayer_algo2QT':
+            if folder != 'audioPlayer':
                 res.append(folder)
             else:
                 res.extend([folder, 'data'])
@@ -27,7 +27,7 @@ def get_data_path() -> str:
     return os.path.join(cur_dir, 'data')
 
 
-def duration_from_seconds(seconds: int) -> str:
+def duration_from_seconds(seconds: float) -> str:
     """
     Функция перевода секунд в читаемый для человека формат
 
