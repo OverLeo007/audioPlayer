@@ -72,7 +72,7 @@ class PlayList(DoubleLinkedList):
         self.__current_track = head
 
     @property
-    def current_track(self) -> Optional[object]:
+    def current_track(self) -> Composition:
         """
         Свойство - геттер, возвращает дату текущего трека
         :return: дата текущего трека

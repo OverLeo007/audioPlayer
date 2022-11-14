@@ -14,17 +14,27 @@ def get_data_path() -> str:
     :return: путь до папки с датой
     """
     cur_dir = os.getcwd()
-    if not cur_dir.endswith('audioPlayer_algo2QT'):
-        res = []
-        for folder in cur_dir.split("\\"):
-            if folder != 'audioPlayer_algo2QT':
-                res.append(folder)
-            else:
-                res.extend([folder, 'data'])
-                break
-        return '\\'.join(res)
+    while True:
+        if "data" in os.listdir(cur_dir):
+            break
+        cur_dir = '\\'.join(cur_dir.split("\\")[:-1])
 
     return os.path.join(cur_dir, 'data')
+
+
+def get_track_path() -> str:
+    """
+    Функция нахождения папки с песнями, поддерживающая запуск из любой папки проекта
+
+    :return: путь дол папки с песнями
+    """
+
+    cur_dir = os.getcwd()
+    while True:
+        if "tracks" in os.listdir(cur_dir):
+            break
+        cur_dir = '\\'.join(cur_dir.split("\\")[:-1])
+    return os.path.join(cur_dir, "tracks")
 
 
 def duration_from_seconds(seconds: float) -> str:

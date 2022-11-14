@@ -14,7 +14,7 @@ from PyQt5.QtWidgets import (QScrollArea, QApplication, QWidget,
                              QPushButton, QTabWidget, QSlider,
                              QGroupBox, QDialog, QCheckBox, QLineEdit)
 
-from PyQt5.QtGui import QPixmap, QIcon, QFont
+from PyQt5.QtGui import QPixmap, QIcon, QFont, QMovie
 from PyQt5.QtCore import Qt, QRect, QUrl, pyqtSignal, QSize
 from player_front.ui_templates.templ import Ui_MainWindow
 
@@ -471,6 +471,16 @@ class AudioLine(QGroupBox):  # pylint: disable=R0902
         self.track_pic = QLabel()
         self.track_pic.setPixmap(self.cur_playlist.currentTrack.trackPicLabel.pixmap())
 
+        self.music_playing_gif = QMovie(get_data_path() + "\\dance.gif")
+        self.music_stop_gif = QMovie(get_data_path() + "\\standby.gif")
+        self.musicPlayingGifLabel = QLabel()
+        self.musicPlayingGifLabel.setMovie(self.music_playing_gif)
+        self.musicStopGifLabel = QLabel()
+        self.musicStopGifLabel.setMovie(self.music_stop_gif)
+        self.music_playing_gif.start()
+        self.music_stop_gif.start()
+        self.musicPlayingGifLabel.hide()
+
         self.text_meta_layout = QVBoxLayout()  # Лейаут текстовых данных трека
 
         font = QFont()
@@ -489,6 +499,8 @@ class AudioLine(QGroupBox):  # pylint: disable=R0902
         self.meta_layout.addWidget(self.track_pic)
         self.meta_layout.addLayout(self.text_meta_layout)
         self.meta_layout.addItem(QSpacerItem(40, 20, QSizePolicy.Expanding, QSizePolicy.Minimum))
+        self.meta_layout.addWidget(self.musicPlayingGifLabel)
+        self.meta_layout.addWidget(self.musicStopGifLabel)
 
         self.progressLayout = QHBoxLayout()  # Лейаут прогресса трека
 
@@ -578,11 +590,16 @@ class AudioLine(QGroupBox):  # pylint: disable=R0902
     def play(self):
         self.playPushButton.hide()
         self.pausePushButton.show()
+        self.musicStopGifLabel.hide()
+        self.musicPlayingGifLabel.show()
+
         self.player.play()
 
     def pause(self):
         self.pausePushButton.hide()
         self.playPushButton.show()
+        self.musicPlayingGifLabel.hide()
+        self.musicStopGifLabel.show()
         self.player.pause()
 
     def set_prev_track(self):
@@ -613,7 +630,9 @@ class PlayerUI(QMainWindow, Ui_MainWindow):
 
     def __init__(self):
         super().__init__()
+
         self.setupUi(self)
+        self.setWindowTitle("IKIT MUSIC")
         self.rel = Relator(get_data_path() + '\\playlists.json')
 
         self.playlists = self.rel.load_playlists()
